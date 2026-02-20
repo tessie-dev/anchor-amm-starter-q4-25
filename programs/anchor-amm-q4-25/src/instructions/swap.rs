@@ -26,6 +26,13 @@ pub struct Swap<'info> {
 
     #[account(
         mut,
+        seeds = [b"lp", config.key().as_ref()],
+        bump = config.lp_bump,
+    )]
+    pub mint_lp: Account<'info, Mint>,
+
+    #[account(
+        mut,
         associated_token::mint = mint_x,
         associated_token::authority = config,
     )]
@@ -39,19 +46,23 @@ pub struct Swap<'info> {
     pub vault_y: Account<'info, TokenAccount>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_x,
         associated_token::authority = user,
     )]
     pub user_x: Account<'info, TokenAccount>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_y,
         associated_token::authority = user,
     )]
     pub user_y: Account<'info, TokenAccount>,
 
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -70,9 +81,9 @@ impl<'info> Swap<'info> {
         let mut curve = ConstantProduct::init(
             self.vault_x.amount,
             self.vault_y.amount,
-            0,
+            self.mint_lp.supply,
             self.config.fee,
-            None,
+            Some(6),
         )
         .map_err(AmmError::from)?;
 
@@ -87,6 +98,7 @@ impl<'info> Swap<'info> {
             .map_err(AmmError::from)?
             .withdraw;
 
+        require!(output > 0, AmmError::ZeroBalance);
         require!(output >= min, AmmError::SlippageExceeded);
 
         self.deposit_tokens(is_x, amount)?;

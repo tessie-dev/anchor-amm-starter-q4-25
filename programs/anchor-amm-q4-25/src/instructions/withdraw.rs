@@ -46,14 +46,16 @@ pub struct Withdraw<'info> {
     pub vault_y: Account<'info, TokenAccount>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_x,
         associated_token::authority = user,
     )]
     pub user_x: Account<'info, TokenAccount>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = mint_y,
         associated_token::authority = user,
     )]
@@ -85,6 +87,11 @@ impl<'info> Withdraw<'info> {
         require!(
             self.mint_lp.supply > 0,
             AmmError::NoLiquidityInPool
+        );
+
+        require!(
+            min_x != 0 || min_y != 0,
+            AmmError::InvalidAmount
         );
 
         let amounts = ConstantProduct::xy_withdraw_amounts_from_l(
